@@ -7,7 +7,7 @@
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange)](LICENSE)
 [![status](https://img.shields.io/badge/status-v0.61-blue)](#status)
 
-[中文](README.md)
+[中文](README.ch.md)
 
 ## Why
 
@@ -175,7 +175,7 @@ the trace of each degradation / retry (`model exhausted retries, falling through
 
 If you're using the **Zhipu GLM Coding Plan subscription** (not pay-as-you-go),
 the standard `https://open.bigmodel.cn/api/paas/v4` endpoint will return
-`code: 1113 余额不足或无可用资源包` — coding plan traffic is
+`code: 1113 (insufficient balance or no available resource pack)` — coding plan traffic is
 restricted to its own dedicated endpoint:
 
 ```toml
