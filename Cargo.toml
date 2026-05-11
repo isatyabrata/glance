@@ -10,7 +10,7 @@ description = "MCP server that delegates research / md / obsidian work to a chea
 license = "PolyForm-Noncommercial-1.0.0"
 authors = ["xtftbwvfp"]
 readme = "README.md"
-repository = "https://github.com/xtftbwvfp/glance"
+repository = "https://github.com/isatyabrata/glance"
 
 [[bin]]
 name = "glance-mcp"

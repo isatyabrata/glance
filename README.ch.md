@@ -108,7 +108,7 @@ codex                   ← 拿到 200 token 的摘要，而不是 8KB 的原始
 ## 安装
 
 ```bash
-cargo install --git https://github.com/xtftbwvfp/glance
+cargo install --git https://github.com/isatyabrata/glance
 ```
 
 会把 `glance` (CLI) 和 `glance-mcp` (MCP server) 装到 `~/.cargo/bin/`。

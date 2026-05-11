@@ -103,7 +103,7 @@ pub fn resolve_host_binary() -> Result<PathBuf> {
     Err(anyhow!(
         "{HOST_BIN_NAME} not found on PATH or in ~/.cargo/bin. \
          Install it with:\n  \
-         cargo install --git https://github.com/xtftbwvfp/glance\n\
+         cargo install --git https://github.com/isatyabrata/glance\n\
          or, from a checkout:\n  \
          cargo install --path . --bin {HOST_BIN_NAME} --force"
     ))

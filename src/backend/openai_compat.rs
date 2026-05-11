@@ -25,6 +25,10 @@ pub struct Message {
     /// Set on `role: "tool"` messages — name of the tool that produced this output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// DeepSeek thinking-mode reasoning payload. The API requires this field
+    /// to be echoed back in subsequent requests when the model returns it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
 }
 
 impl Message {
@@ -35,6 +39,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: None,
             name: None,
+            reasoning_content: None,
         }
     }
     pub fn user(text: impl Into<String>) -> Self {
@@ -44,6 +49,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: None,
             name: None,
+            reasoning_content: None,
         }
     }
     pub fn tool(
@@ -57,6 +63,7 @@ impl Message {
             tool_calls: None,
             tool_call_id: Some(call_id.into()),
             name: Some(name.into()),
+            reasoning_content: None,
         }
     }
 }

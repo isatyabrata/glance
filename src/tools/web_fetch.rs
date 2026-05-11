@@ -75,7 +75,7 @@ pub async fn call(args: Value) -> Result<CallToolResult> {
     // do this for us but binds an internal client we can't tune.
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
-        .user_agent("glance-mcp/0.1 (+https://github.com/xtftbwvfp/glance)")
+        .user_agent("glance-mcp/0.1 (+https://github.com/isatyabrata/glance)")
         .build()
         .context("build reqwest client")?;
 
