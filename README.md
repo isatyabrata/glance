@@ -116,7 +116,7 @@ calling model (codex / claude / cursor) to review and apply.
 ## Install
 
 ```bash
-cargo install --git https://github.com/isatyabrata/glance-mcp
+cargo install --git https://github.com/isatyabrata/glance
 ```
 
 This installs both `glance` (CLI) and `glance-mcp` (MCP server) into
