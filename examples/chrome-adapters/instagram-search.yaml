@@ -1,0 +1,54 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/instagram/search.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/instagram-search.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: instagram
+name: search
+description: Search Instagram users
+domain: www.instagram.com
+
+args:
+  query:
+    type: str
+    required: true
+    positional: true
+    description: Search query
+  limit:
+    type: int
+    default: 10
+    description: Number of results
+
+pipeline:
+  - navigate: https://www.instagram.com
+
+  - evaluate: |
+      (async () => {
+        const query = ${{ args.query | json }};
+        const limit = ${{ args.limit }};
+        const res = await fetch(
+          'https://www.instagram.com/web/search/topsearch/?query=' + encodeURIComponent(query) + '&context=user',
+          {
+            credentials: 'include',
+            headers: { 'X-IG-App-ID': '936619743392459' }
+          }
+        );
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' - make sure you are logged in to Instagram');
+        const data = await res.json();
+        const users = (data?.users || []).slice(0, limit);
+        return users.map((item, i) => ({
+          rank: i + 1,
+          username: item.user?.username || '',
+          name: item.user?.full_name || '',
+          verified: item.user?.is_verified ? 'Yes' : 'No',
+          private: item.user?.is_private ? 'Yes' : 'No',
+        }));
+      })()
+
+columns: [rank, username, name, verified, private]

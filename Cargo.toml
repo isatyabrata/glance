@@ -1,0 +1,64 @@
+[workspace]
+members = [".", "glance-app/src-tauri"]
+resolver = "2"
+
+[package]
+name = "glance"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server that delegates research / md / obsidian work to a cheap sub-agent (GLM, DeepSeek, etc) so codex/claude/cursor save tokens"
+license = "PolyForm-Noncommercial-1.0.0"
+authors = ["xtftbwvfp"]
+readme = "README.md"
+repository = "https://github.com/xtftbwvfp/glance"
+
+[[bin]]
+name = "glance-mcp"
+path = "src/bin/glance_mcp.rs"
+
+[[bin]]
+name = "glance"
+path = "src/bin/glance.rs"
+
+[[bin]]
+name = "glance-chrome-host"
+path = "src/bin/glance_chrome_host.rs"
+
+[lib]
+name = "glance"
+path = "src/lib.rs"
+
+[dependencies]
+# 协议 / 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# 异步 runtime
+tokio = { version = "1", features = ["rt-multi-thread", "io-std", "io-util", "macros", "fs", "process", "time", "sync", "signal", "net"] }
+once_cell = "1"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# 杂项
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+dirs = "5"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+walkdir = "2"
+regex = "1"
+serde_yaml = "0.9"
+clap = { version = "4", features = ["derive"] }
+
+# 4 new gateway tools (web_fetch / repo_explore / image_describe / web_search)
+readability = { version = "0.3", default-features = false }
+url = "2"
+octocrab = "0.50"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3"

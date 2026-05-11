@@ -1,0 +1,50 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/tiktok/explore.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/tiktok-explore.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: tiktok
+name: explore
+description: Get trending TikTok videos from explore page
+domain: www.tiktok.com
+
+args:
+  limit:
+    type: int
+    default: 20
+    description: Number of videos
+
+pipeline:
+  - navigate:
+      url: https://www.tiktok.com/explore
+      settleMs: 5000
+
+  - evaluate: |
+      (() => {
+        const limit = ${{ args.limit }};
+        const links = Array.from(document.querySelectorAll('a[href*="/video/"]'));
+        const seen = new Set();
+        const results = [];
+        for (const a of links) {
+          const href = a.href;
+          if (seen.has(href)) continue;
+          seen.add(href);
+          const match = href.match(/@([^/]+)\/video\/(\d+)/);
+          results.push({
+            rank: results.length + 1,
+            author: match ? match[1] : '',
+            views: a.textContent.trim() || '-',
+            url: href,
+          });
+          if (results.length >= limit) break;
+        }
+        return results;
+      })()
+
+columns: [rank, author, views, url]

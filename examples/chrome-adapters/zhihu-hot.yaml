@@ -1,0 +1,57 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/zhihu/hot.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/zhihu-hot.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: zhihu
+name: hot
+description: 知乎热榜
+domain: www.zhihu.com
+
+args:
+  limit:
+    type: int
+    default: 20
+    description: Number of items to return
+
+pipeline:
+  - navigate: https://www.zhihu.com
+
+  - evaluate: |
+      (async () => {
+        const res = await fetch('https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50', {
+          credentials: 'include'
+        });
+        const text = await res.text();
+        const d = JSON.parse(
+          text.replace(/("id"\s*:\s*)(\d{16,})/g, '$1"$2"')
+        );
+        return (d?.data || []).map((item) => {
+          const t = item.target || {};
+          const questionId = t.id == null ? '' : String(t.id);
+          return {
+            title: t.title,
+            url: 'https://www.zhihu.com/question/' + questionId,
+            answer_count: t.answer_count,
+            follower_count: t.follower_count,
+            heat: item.detail_text || '',
+          };
+        });
+      })()
+
+  - map:
+      rank: ${{ index + 1 }}
+      title: ${{ item.title }}
+      heat: ${{ item.heat }}
+      answers: ${{ item.answer_count }}
+      url: ${{ item.url }}
+
+  - limit: ${{ args.limit }}
+
+columns: [rank, title, heat, answers]

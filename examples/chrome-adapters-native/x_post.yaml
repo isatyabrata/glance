@@ -1,0 +1,37 @@
+name: x_post
+description: 'Quick X composer inspector. To post, use os_paste + click directly.'
+match_url: '^https?://(www\.)?(twitter|x)\.com'
+await_promise: true
+
+# `world: cdp` keeps this safe on x.com's strict CSP.
+world: cdp
+
+args:
+  - name: expected_len
+    description: 'Optional. If set, verifies composer text length matches.'
+    required: false
+
+# v0.49 split-of-concerns: actual posting is done in two MCP calls —
+#   1. `chrome { action: "os_paste", tab_id, selector: "[data-testid=tweetTextarea_0]", value: "tweet text" }`
+#   2. `chrome { action: "click",    tab_id, selector: "[data-testid=tweetButton]" }`
+# This adapter just reports the composer state so an LLM can verify before
+# clicking Post: composer text, char counter, Post button enabled state.
+evaluate: |
+  (async () => {
+    const editor = document.querySelector('[data-testid="tweetTextarea_0"]')
+                 || document.querySelector('div[role="textbox"][contenteditable="true"]');
+    const btn = document.querySelector('[data-testid="tweetButton"]')
+             || document.querySelector('[data-testid="tweetButtonInline"]');
+    const text = (editor?.innerText || '').slice(0, 4096);
+    const len = text.length;
+    const expected = args.expected_len;
+    return {
+      url: location.href,
+      composerFound: !!editor,
+      composerText: text,
+      composerLen: len,
+      lenMatches: expected == null ? null : len === Number(expected),
+      postButtonFound: !!btn,
+      postButtonEnabled: btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true',
+    };
+  })()

@@ -1,0 +1,48 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/bilibili/hot.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/bilibili-hot.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: bilibili
+name: hot
+description: B站热门视频
+domain: www.bilibili.com
+strategy: cookie
+
+args:
+  limit:
+    type: int
+    default: 20
+    description: Number of videos
+
+pipeline:
+  - evaluate: |
+      (async () => {
+        const res = await fetch('https://api.bilibili.com/x/web-interface/popular?ps=${{ args.limit }}&pn=1', {
+          credentials: 'include'
+        });
+        const data = await res.json();
+        return (data?.data?.list || []).map((item) => ({
+          title: item.title,
+          author: item.owner?.name,
+          play: item.stat?.view,
+          danmaku: item.stat?.danmaku,
+        }));
+      })()
+
+  - map:
+      rank: ${{ index + 1 }}
+      title: ${{ item.title }}
+      author: ${{ item.author }}
+      play: ${{ item.play }}
+      danmaku: ${{ item.danmaku }}
+
+  - limit: ${{ args.limit }}
+
+columns: [rank, title, author, play, danmaku]

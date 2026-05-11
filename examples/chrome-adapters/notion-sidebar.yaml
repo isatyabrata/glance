@@ -1,0 +1,37 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/notion/sidebar.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# Notion needs an existing logged-in session (the glance Chrome bridge
+# reuses your real Chrome cookies, so this works as long as Notion is open
+# in a tab). Run `glance chrome import examples/chrome-adapters/notion-sidebar.yaml`
+# to install.
+
+site: notion
+name: sidebar
+description: List pages and databases from the Notion sidebar (DOM scrape)
+domain: www.notion.so
+strategy: cookie
+browser: true
+
+columns: [Index, Title]
+
+pipeline:
+  - evaluate: |
+      (function() {
+        const results = [];
+        const selectors = ['[class*="sidebar"] [role="treeitem"]', '[class*="sidebar"] a', '.notion-sidebar [role="button"]', 'nav [role="treeitem"]'];
+        for (const sel of selectors) {
+          const nodes = document.querySelectorAll(sel);
+          if (nodes.length > 0) {
+            nodes.forEach((n, i) => {
+              const text = (n.textContent || '').trim().substring(0, 100);
+              if (text && text.length > 1) results.push({ Index: i + 1, Title: text });
+            });
+            break;
+          }
+        }
+        if (results.length === 0) return [{ Index: 0, Title: 'No sidebar items found. Toggle the sidebar first.' }];
+        return results;
+      })()

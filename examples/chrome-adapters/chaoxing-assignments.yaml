@@ -1,0 +1,42 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/chaoxing/assignments.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/chaoxing-assignments.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: chaoxing
+name: assignments
+description: "学习通作业列表"
+domain: mooc2-ans.chaoxing.com
+strategy: cookie
+browser: true
+timeoutSeconds: 90
+
+args:
+  course:
+    type: string
+    description: "按课程名过滤（模糊匹配）"
+  status:
+    type: string
+    default: all
+    choices: [all, pending, submitted, graded]
+    description: "按状态过滤"
+  limit:
+    type: int
+    default: 20
+    description: "最大返回数量"
+
+columns: [rank, course, title, deadline, status, score]
+
+pipeline:
+  - navigate: https://mooc2-ans.chaoxing.com/mooc2-ans/visit/interaction
+  - wait: 2
+  - evaluate: |
+      (async () => {
+        return [{ rank: 1, course: 'info', title: 'Chaoxing assignments requires multi-course iframe navigation chain.', deadline: '', status: 'Use the TypeScript adapter for full functionality.', score: '' }];
+      })()

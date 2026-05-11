@@ -1,0 +1,45 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/weibo/hot.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/weibo-hot.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: weibo
+name: hot
+description: 微博热搜
+domain: weibo.com
+
+args:
+  limit:
+    type: int
+    default: 30
+    description: Number of items (max 50)
+
+pipeline:
+  - navigate: https://weibo.com
+
+  - evaluate: |
+      (async () => {
+        const resp = await fetch('/ajax/statuses/hot_band', {credentials: 'include'});
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        if (!data.ok) return [];
+        const bandList = data.data?.band_list || [];
+        return bandList.map((item, i) => ({
+          rank: item.realpos || (i + 1),
+          word: item.word,
+          hot_value: item.num || 0,
+          category: item.category || '',
+          label: item.label_name || '',
+          url: 'https://s.weibo.com/weibo?q=' + encodeURIComponent('#' + item.word + '#')
+        }));
+      })()
+
+  - limit: ${{ args.limit }}
+
+columns: [rank, word, hot_value, category, label, url]

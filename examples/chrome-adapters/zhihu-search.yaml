@@ -1,0 +1,69 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/zhihu/search.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/zhihu-search.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: zhihu
+name: search
+description: 知乎搜索
+domain: www.zhihu.com
+
+args:
+  query:
+    positional: true
+    type: str
+    required: true
+    description: Search query
+  limit:
+    type: int
+    default: 10
+    description: Number of results
+
+pipeline:
+  - navigate: https://www.zhihu.com
+
+  - evaluate: |
+      (async () => {
+        const strip = (html) => (html || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/<em>/g, '').replace(/<\/em>/g, '').trim();
+        const keyword = ${{ args.query | json }};
+        const limit = ${{ args.limit }};
+        const res = await fetch('https://www.zhihu.com/api/v4/search_v3?q=' + encodeURIComponent(keyword) + '&t=general&offset=0&limit=' + limit, {
+          credentials: 'include'
+        });
+        const d = await res.json();
+        return (d?.data || [])
+          .filter(item => item.type === 'search_result')
+          .map(item => {
+            const obj = item.object || {};
+            const q = obj.question || {};
+            return {
+              type: obj.type,
+              title: strip(obj.title || q.name || ''),
+              excerpt: strip(obj.excerpt || '').substring(0, 100),
+              author: obj.author?.name || '',
+              votes: obj.voteup_count || 0,
+              url: obj.type === 'answer'
+                ? 'https://www.zhihu.com/question/' + q.id + '/answer/' + obj.id
+                : obj.type === 'article'
+                ? 'https://zhuanlan.zhihu.com/p/' + obj.id
+                : 'https://www.zhihu.com/question/' + obj.id,
+            };
+          });
+      })()
+
+  - map:
+      rank: ${{ index + 1 }}
+      title: ${{ item.title }}
+      type: ${{ item.type }}
+      author: ${{ item.author }}
+      votes: ${{ item.votes }}
+
+  - limit: ${{ args.limit }}
+
+columns: [rank, title, type, author, votes]

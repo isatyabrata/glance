@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Glance Chrome Bridge",
+  "version": "0.10.2",
+  "description": "Bridge Glance MCP server to your live Chrome via native messaging.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxxt/G7+uDFl11yyf4lzl3b9+mHLnfB3QL4dT+QojIjolmHPnWsYTBclIGsI/G4fmpolZhQEbaBK/sJEqS/0FaUdK2mIrJiLMUMiFCNGw2GJ7gWY76F03PoeExHUUAxEjF7eHQo1ZRMSYFjq0aSZHhEwD2KQmGuhpbnSoNA1otzxAdyTKWtY5jo6knoham72AHctpZDNtNkKIFZPx8+Ihf/KoEr331l9sctZ056D/B7kXrUGj/n/NX+1LqMFZGk6iQevLVqlomSs3969ZouXGHJBQTXmX7T5sWAa/g6dOhymHj4qF+fjWWDDBUc/F1RpOowXqhhPpdDB2PzQSDFO2FwIDAQAB",
+  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "scripting",
+    "debugger",
+    "nativeMessaging",
+    "alarms",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Glance",
+    "default_popup": "popup.html"
+  }
+}

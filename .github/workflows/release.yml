@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive_ext: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive_ext: tar.gz
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive_ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive_ext: zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release binaries
+        run: cargo build --release --bin glance --bin glance-mcp --target ${{ matrix.target }}
+
+      - name: Strip binaries (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          strip target/${{ matrix.target }}/release/glance || true
+          strip target/${{ matrix.target }}/release/glance-mcp || true
+
+      - name: Stage artifacts
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          dist_name="glance-${{ matrix.target }}"
+          mkdir -p "dist/${dist_name}"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "target/${{ matrix.target }}/release/glance.exe" "dist/${dist_name}/"
+            cp "target/${{ matrix.target }}/release/glance-mcp.exe" "dist/${dist_name}/"
+          else
+            cp "target/${{ matrix.target }}/release/glance" "dist/${dist_name}/"
+            cp "target/${{ matrix.target }}/release/glance-mcp" "dist/${dist_name}/"
+          fi
+          cp README.md LICENSE "dist/${dist_name}/" || true
+
+          cd dist
+          if [ "${{ matrix.archive_ext }}" = "zip" ]; then
+            7z a "${dist_name}.zip" "${dist_name}" >/dev/null
+            echo "archive=dist/${dist_name}.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -czf "${dist_name}.tar.gz" "${dist_name}"
+            echo "archive=dist/${dist_name}.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glance-${{ matrix.target }}
+          path: ${{ steps.stage.outputs.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Draft GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: dist/**/*

@@ -1,0 +1,46 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/bilibili/ranking.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/bilibili-ranking.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: bilibili
+name: ranking
+description: Get Bilibili video ranking board
+domain: www.bilibili.com
+strategy: cookie
+
+args:
+  limit:
+    type: int
+    default: 20
+    description: Number of results
+
+columns: [rank, title, author, score, url]
+
+pipeline:
+  - navigate: https://www.bilibili.com
+
+  - evaluate: |
+      (async () => {
+        const limit = ${{ args.limit }};
+
+        const res = await fetch('https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all', {
+          credentials: 'include'
+        });
+        const payload = await res.json();
+        const results = payload?.data?.list || [];
+
+        return results.slice(0, Number(limit)).map((item, i) => ({
+          rank: i + 1,
+          title: item.title || '',
+          author: item.owner?.name || '',
+          score: item.stat?.view || 0,
+          url: item.bvid ? 'https://www.bilibili.com/video/' + item.bvid : ''
+        }));
+      })()

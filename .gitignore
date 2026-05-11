@@ -1,0 +1,26 @@
+# Rust
+/target
+**/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Frontend
+**/node_modules/
+glance-app/dist/
+glance-app/src-tauri/gen/
+
+# IDE
+/.vscode
+/.idea
+*.swp
+
+# OS
+.DS_Store
+
+# glance runtime
+/.glance
+~/.glance/
+
+# Local-only configs that may contain keys
+glance.toml
+.env

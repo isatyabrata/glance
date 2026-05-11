@@ -1,0 +1,55 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/bilibili/dynamic.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/bilibili-dynamic.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: bilibili
+name: dynamic
+description: Get Bilibili user dynamic feed
+domain: www.bilibili.com
+strategy: cookie
+
+args:
+  limit:
+    type: int
+    default: 15
+    description: Number of results
+
+columns: [id, author, text, likes, url]
+
+pipeline:
+  - navigate: https://www.bilibili.com
+
+  - evaluate: |
+      (async () => {
+        const limit = ${{ args.limit }};
+
+        const res = await fetch('https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all', {
+          credentials: 'include'
+        });
+        const payload = await res.json();
+        const results = payload?.data?.items || [];
+
+        return results.slice(0, Number(limit)).map((item) => {
+          let text = '';
+          if (item.modules?.module_dynamic?.desc?.text) {
+            text = item.modules.module_dynamic.desc.text;
+          } else if (item.modules?.module_dynamic?.major?.archive?.title) {
+            text = item.modules.module_dynamic.major.archive.title;
+          }
+
+          return {
+            id: item.id_str || '',
+            author: item.modules?.module_author?.name || '',
+            text: text,
+            likes: item.modules?.module_stat?.like?.count || 0,
+            url: item.id_str ? 'https://t.bilibili.com/' + item.id_str : ''
+          };
+        });
+      })()

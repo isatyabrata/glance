@@ -1,0 +1,72 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/reddit/search.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/reddit-search.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: reddit
+name: search
+description: Search Reddit Posts
+domain: reddit.com
+strategy: cookie
+browser: true
+
+args:
+  query:
+    positional: true
+    type: string
+    required: true
+  subreddit:
+    type: string
+    default: ""
+    description: "Search within a specific subreddit"
+  sort:
+    type: string
+    default: relevance
+    description: "Sort order: relevance, hot, top, new, comments"
+  time:
+    type: string
+    default: all
+    description: "Time filter: hour, day, week, month, year, all"
+  limit:
+    type: int
+    default: 15
+
+columns: [title, subreddit, author, score, comments, url]
+
+pipeline:
+  - navigate: https://www.reddit.com
+  - evaluate: |
+      (async () => {
+        const q = encodeURIComponent(${{ args.query | json }});
+        const sub = ${{ args.subreddit | json }};
+        const sort = ${{ args.sort | json }};
+        const time = ${{ args.time | json }};
+        const limit = ${{ args.limit }};
+        const basePath = sub ? '/r/' + sub + '/search.json' : '/search.json';
+        const params = 'q=' + q + '&sort=' + sort + '&t=' + time + '&limit=' + limit
+          + '&restrict_sr=' + (sub ? 'on' : 'off') + '&raw_json=1';
+        const res = await fetch(basePath + '?' + params, { credentials: 'include' });
+        const d = await res.json();
+        return (d?.data?.children || []).map(c => ({
+          title: c.data.title,
+          subreddit: c.data.subreddit_name_prefixed,
+          author: c.data.author,
+          score: c.data.score,
+          comments: c.data.num_comments,
+          url: 'https://www.reddit.com' + c.data.permalink,
+        }));
+      })()
+  - map:
+      title: ${{ item.title }}
+      subreddit: ${{ item.subreddit }}
+      author: ${{ item.author }}
+      score: ${{ item.score }}
+      comments: ${{ item.comments }}
+      url: ${{ item.url }}
+  - limit: ${{ args.limit }}

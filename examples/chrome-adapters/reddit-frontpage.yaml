@@ -1,0 +1,41 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/reddit/frontpage.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/reddit-frontpage.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: reddit
+name: frontpage
+description: Reddit Frontpage / r/all
+domain: reddit.com
+strategy: cookie
+browser: true
+
+args:
+  limit:
+    type: int
+    default: 15
+
+columns: [title, subreddit, author, upvotes, comments, url]
+
+pipeline:
+  - navigate: https://www.reddit.com
+  - evaluate: |
+      (async () => {
+        const res = await fetch('/r/all.json?limit=${{ args.limit }}', { credentials: 'include' });
+        const j = await res.json();
+        return j?.data?.children || [];
+      })()
+  - map:
+      title: ${{ item.data.title }}
+      subreddit: ${{ item.data.subreddit_name_prefixed }}
+      author: ${{ item.data.author }}
+      upvotes: ${{ item.data.score }}
+      comments: ${{ item.data.num_comments }}
+      url: https://www.reddit.com${{ item.data.permalink }}
+  - limit: ${{ args.limit }}

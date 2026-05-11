@@ -1,0 +1,51 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/linux-do/latest.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/linux-do-latest.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: linux-do
+name: latest
+description: linux.do 最新话题
+domain: linux.do
+browser: true
+
+args:
+  limit:
+    type: int
+    default: 20
+    description: Number of topics
+
+pipeline:
+  - navigate: https://linux.do
+
+  - evaluate: |
+      (async () => {
+        const res = await fetch('/latest.json', { credentials: 'include' });
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' - 请先登录 linux.do');
+        let data;
+        try { data = await res.json(); } catch { throw new Error('响应不是有效 JSON - 请先登录 linux.do'); }
+        const topics = data?.topic_list?.topics || [];
+        return topics.slice(0, ${{ args.limit }}).map(t => ({
+          title: t.title,
+          replies: (t.posts_count || 1) - 1,
+          views: t.views,
+          likes: t.like_count,
+        }));
+      })()
+
+  - map:
+      rank: ${{ index + 1 }}
+      title: ${{ item.title }}
+      replies: ${{ item.replies }}
+      views: ${{ item.views }}
+      likes: ${{ item.likes }}
+
+  - limit: ${{ args.limit }}
+
+columns: [rank, title, replies, views, likes]

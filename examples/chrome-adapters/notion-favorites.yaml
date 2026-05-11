@@ -1,0 +1,42 @@
+# Vendored from autocli (Apache-2.0).
+#   Source: https://github.com/nashsu/AutoCLI/blob/c0969e2c83b29a7528452b1ba555085deca8e00d/adapters/notion/favorites.yaml
+#   Adapter logic originally derived from opencli (https://github.com/jackwener/opencli).
+#   Original author: jackwener / nash_su.
+#
+# To install: glance chrome import examples/chrome-adapters/notion-favorites.yaml
+# (re-imports translate this autocli-format YAML into glance native schema
+#  written to ~/.glance/chrome-adapters/.)
+
+# Adapter logic derived from OpenCLI (https://github.com/jackwener/opencli)
+# Original author: jackwener | License: Apache-2.0
+site: notion
+name: favorites
+description: List pages from the Notion Favorites section in the sidebar
+domain: localhost
+strategy: ui
+browser: true
+
+columns: [Index, Title, Icon]
+
+pipeline:
+  - evaluate: |
+      (function() {
+        const results = [];
+        const headerContainer = document.querySelector('.notion-outliner-bookmarks-header-container');
+        if (headerContainer) {
+          let section = headerContainer.parentElement;
+          if (section && section.children.length === 1) section = section.parentElement;
+          if (section) {
+            const treeItems = section.querySelectorAll('[role="treeitem"]');
+            treeItems.forEach((item) => {
+              const titleEl = item.querySelector('div.notranslate:not(.notion-record-icon)');
+              const title = titleEl ? titleEl.textContent.trim() : (item.textContent || '').trim().substring(0, 80);
+              const iconEl = item.querySelector('.notion-record-icon');
+              const icon = iconEl ? iconEl.textContent.trim().substring(0, 4) : '';
+              if (title && title.length > 0) results.push({ Index: results.length + 1, Title: title, Icon: icon || 'page' });
+            });
+          }
+        }
+        if (results.length === 0) return [{ Index: 0, Title: 'No favorites found. Make sure sidebar is visible.', Icon: 'warn' }];
+        return results;
+      })()
