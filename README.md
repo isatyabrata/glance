@@ -466,3 +466,7 @@ separate license — open an issue if interested.
 - CCUSAGE usage panel (daily / session breakdown) data sourced from
   [ccusage](https://github.com/ryoppippi/ccusage) — parses Claude Code's local
   billing sqlite into visual reports; glance shells out to its CLI.
+
+---
+
+**Forked from [xtftbwvfp/glance](https://github.com/xtftbwvfp/glance)** — all credit for the original architecture, tools, and Chrome bridge goes to the original author.
