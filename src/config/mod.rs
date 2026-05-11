@@ -241,7 +241,7 @@ fn default_max_tokens() -> u32 {
     8000
 }
 fn default_timeout() -> u32 {
-    60
+    90
 }
 
 /// Retry policy for backend HTTP calls (chat completions + vision).
@@ -286,9 +286,9 @@ fn default_retry_max_secs() -> u64 {
 pub struct SubAgentConfig {
     #[serde(default = "default_iterations")]
     pub max_iterations: u32,
-    /// Wall-clock budget for one sub-agent run. The default leaves a 30 s
-    /// safety margin under the MCP client's 120 s tools/call timeout, so the
-    /// main model never gets stuck waiting for a hung sub-agent. When the
+    /// Wall-clock budget for one sub-agent run. The default (110 s) leaves a
+    /// 10 s safety margin under the MCP client's 120 s tools/call timeout, so
+    /// the main model never gets stuck waiting for a hung sub-agent. When the
     /// deadline hits, sub_agent returns the partial summary it has.
     #[serde(default = "default_deadline_secs")]
     pub deadline_secs: u64,
@@ -313,17 +313,15 @@ fn default_iterations() -> u32 {
 }
 
 fn default_deadline_secs() -> u64 {
-    90
+    110
 }
 
 fn default_chat_timeout_secs() -> u64 {
-    // First GLM call often pays TLS handshake + model cold-start, easily
-    // 30-40 s on a fresh connection. 25 s was too aggressive — the abort
-    // fires before the first turn even completes, returning a useless
-    // "0 iters / 0 tool calls" partial. 45 s leaves room for one slow
-    // first call without letting a truly hung connection eat all 90 s of
-    // the deadline budget.
-    45
+    // Reasoning models (DeepSeek-v4-pro, o1, etc.) generate hidden reasoning
+    // tokens before the visible response — a single call can take 40-80 s.
+    // 90 s leaves headroom for one slow reasoning call + potential retries
+    // without letting a truly hung connection eat the full deadline budget.
+    90
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
