@@ -241,7 +241,10 @@ fn default_max_tokens() -> u32 {
     8000
 }
 fn default_timeout() -> u32 {
-    90
+    // Reasoning models (deepseek-v4-pro) can take 60-100 s per call because
+    // they generate hidden chain-of-thought tokens before the visible response.
+    // 120 s leaves headroom without exceeding the MCP client's 120 s ceiling.
+    120
 }
 
 /// Retry policy for backend HTTP calls (chat completions + vision).
@@ -286,8 +289,8 @@ fn default_retry_max_secs() -> u64 {
 pub struct SubAgentConfig {
     #[serde(default = "default_iterations")]
     pub max_iterations: u32,
-    /// Wall-clock budget for one sub-agent run. The default (110 s) leaves a
-    /// 10 s safety margin under the MCP client's 120 s tools/call timeout, so
+    /// Wall-clock budget for one sub-agent run. The default (115 s) leaves a
+    /// 5 s safety margin under the MCP client's 120 s tools/call timeout, so
     /// the main model never gets stuck waiting for a hung sub-agent. When the
     /// deadline hits, sub_agent returns the partial summary it has.
     #[serde(default = "default_deadline_secs")]
@@ -313,15 +316,18 @@ fn default_iterations() -> u32 {
 }
 
 fn default_deadline_secs() -> u64 {
-    110
+    // Aligned with the transport layer's 115 s guard. Reasoning models may
+    // only fit one full iteration; fast models can still do 3-5. Either way
+    // we stay under the MCP client's 120 s tools/call ceiling.
+    115
 }
 
 fn default_chat_timeout_secs() -> u64 {
-    // Reasoning models (DeepSeek-v4-pro, o1, etc.) generate hidden reasoning
-    // tokens before the visible response — a single call can take 40-80 s.
-    // 90 s leaves headroom for one slow reasoning call + potential retries
-    // without letting a truly hung connection eat the full deadline budget.
-    90
+    // Reasoning models (deepseek-v4-pro, o1, etc.) generate hidden reasoning
+    // tokens before the visible response — a single call can take 60-100 s.
+    // 115 s covers one slow call with a small buffer. Tighter than the 120 s
+    // MCP ceiling so the transport layer has room to return a clean error.
+    115
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
