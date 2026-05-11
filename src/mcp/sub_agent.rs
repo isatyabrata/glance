@@ -118,7 +118,7 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
         let calls = turn.message.tool_calls.clone().unwrap_or_default();
         if calls.is_empty() {
             // Done — model returned a plain answer.
-            let answer = turn.message.content.unwrap_or_default();
+            let answer = extract_answer_content(&turn.message).unwrap_or_default();
             tracing::info!(
                 iter = iter + 1,
                 tool_calls = tool_calls_count,
@@ -156,7 +156,7 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
         .iter()
         .rev()
         .find(|m| m.role == "assistant")
-        .and_then(|m| m.content.clone())
+        .and_then(extract_answer_content)
         .unwrap_or_else(|| "[sub-agent hit max_iterations without final answer]".to_string());
     Ok(SubAgentRun {
         answer: last,
@@ -188,13 +188,13 @@ fn finalize_partial(
         .iter()
         .rev()
         .find(|m| m.role == "assistant")
-        .and_then(|m| m.content.clone())
+        .and_then(extract_answer_content)
         .unwrap_or_else(|| "[sub-agent had no partial output]".to_string());
     let advice = if iter == 0 {
         // First chat call never returned. Almost always a backend connectivity
-        // issue — slow GLM, cold connection, network blip. Telling the caller
+        // issue — slow model, cold connection, network blip. Telling the caller
         // to "narrow scope" wouldn't help; tell them to use local tools.
-        "GLM backend slow / unreachable — fall back to local Grep / Read for this task; retry research later if you need a deeper synthesis"
+        "Backend slow / unreachable — fall back to local Grep / Read for this task; retry research later if you need a deeper synthesis"
     } else {
         "narrow the scope or split the query"
     };
@@ -484,6 +484,29 @@ async fn tool_grep(args: Value) -> Result<String> {
     } else {
         Ok(hits.join("\n"))
     }
+}
+
+/// Extract the best available text from an assistant message.
+///
+/// DeepSeek reasoning models (deepseek-v4-pro) may return `content: null` in
+/// the final response while the actual output lives in `reasoning_content`.
+/// Try `content` first; if it's missing or whitespace-only, fall back to
+/// `reasoning_content`. Returns `None` only when both are truly empty.
+fn extract_answer_content(msg: &Message) -> Option<String> {
+    if let Some(c) = &msg.content {
+        let trimmed = c.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    if let Some(rc) = &msg.reasoning_content {
+        let trimmed = rc.trim();
+        if !trimmed.is_empty() {
+            tracing::warn!("assistant content empty, falling back to reasoning_content");
+            return Some(trimmed.to_string());
+        }
+    }
+    None
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
