@@ -284,7 +284,20 @@ impl Client {
             let resp = match send_result {
                 Ok(r) => r,
                 Err(e) => {
-                    let transient = e.is_timeout() || e.is_connect() || e.is_request();
+                    // Don't retry on timeout — the model is too slow, so
+                    // fall through to the next fallback model immediately.
+                    // Retry on connect/reset (transient network blips).
+                    if e.is_timeout() {
+                        tracing::warn!(
+                            model,
+                            err = %e,
+                            "backend HTTP timeout — falling through to next model"
+                        );
+                        return Err(ChatAttemptError::Transient(
+                            anyhow::Error::from(e).context("backend HTTP timeout"),
+                        ));
+                    }
+                    let transient = e.is_connect() || e.is_request();
                     if transient && attempt < max_retries {
                         let wait = Duration::from_millis(base_backoff_ms * (3u64.pow(attempt)));
                         tracing::warn!(

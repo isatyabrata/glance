@@ -51,7 +51,12 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
             "backend api_key is empty — set it in ~/.glance/config.toml or via GLANCE_API_KEY"
         ));
     }
-    let client = Client::new(cfg.backend.clone())?;
+    let http_timeout = cfg.backend.timeout_secs;
+    let has_fallback = !cfg.backend.fallback_models.is_empty();
+    let mut client = Client::new(cfg.backend.clone())?;
+    // When the primary reasoning model proves too slow for the deadline budget,
+    // we switch to a fast-only client so remaining iterations complete in time.
+    let mut use_fast_only = false;
 
     let combined_system = format!("{}{}", system, GROUNDING_GUARD);
     let mut messages = vec![Message::system(&combined_system), Message::user(user)];
@@ -64,7 +69,7 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
         + std::time::Duration::from_secs(cfg.sub_agent.deadline_secs.max(10));
     let chat_timeout = std::time::Duration::from_secs(cfg.sub_agent.chat_timeout_secs.max(5));
     for iter in 0..max_iter {
-        // Bail before paying for another GLM round-trip if we're out of budget.
+        // Bail before paying for another round-trip if we're out of budget.
         if std::time::Instant::now() >= deadline {
             tracing::warn!(
                 iter,
@@ -74,7 +79,30 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
             );
             return Ok(finalize_partial(messages, iter, tool_calls_count, total, bytes_in, "deadline"));
         }
+
+        // If the primary model is too slow and we have a fallback, switch to
+        // fast-only before the next call so we don't waste the remaining budget.
+        if !use_fast_only && has_fallback {
+            let remaining = deadline
+                .saturating_duration_since(std::time::Instant::now())
+                .as_secs();
+            // Not enough time for primary timeout + fallback → skip primary.
+            if remaining < http_timeout.saturating_add(10) as u64 {
+                tracing::warn!(
+                    remaining,
+                    http_timeout,
+                    "low remaining budget — switching to fast-only model"
+                );
+                use_fast_only = true;
+                let mut fast_cfg = cfg.backend.clone();
+                fast_cfg.model = fast_cfg.fallback_models[0].clone();
+                fast_cfg.fallback_models.clear();
+                client = Client::new(fast_cfg)?;
+            }
+        }
+
         let tools = internal_tool_specs();
+        let call_start = std::time::Instant::now();
         let turn = match tokio::time::timeout(chat_timeout, client.chat(&messages, tools)).await {
             Ok(Ok(t)) => t,
             Ok(Err(e)) => return Err(e),
@@ -88,6 +116,24 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
                 return Ok(finalize_partial(messages, iter, tool_calls_count, total, bytes_in, "chat-timeout"));
             }
         };
+        let call_elapsed = call_start.elapsed().as_secs();
+
+        // If this call took close to the HTTP timeout, the primary model likely
+        // timed out and the fallback was used. Mark it so we skip the primary on
+        // subsequent iterations and save time.
+        if !use_fast_only && has_fallback && call_elapsed >= http_timeout.saturating_sub(5) as u64 {
+            tracing::warn!(
+                iter,
+                call_elapsed,
+                http_timeout,
+                "primary model appears slow — switching to fast-only for remaining iters"
+            );
+            use_fast_only = true;
+            let mut fast_cfg = cfg.backend.clone();
+            fast_cfg.model = fast_cfg.fallback_models[0].clone();
+            fast_cfg.fallback_models.clear();
+            client = Client::new(fast_cfg)?;
+        }
 
         // One round-trip to the GLM backend is one billable iteration —
         // count it whether or not the response carried a usage block.

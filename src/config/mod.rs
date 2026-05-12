@@ -241,10 +241,10 @@ fn default_max_tokens() -> u32 {
     8000
 }
 fn default_timeout() -> u32 {
-    // Reasoning models (deepseek-v4-pro) can take 60-100 s per call because
-    // they generate hidden chain-of-thought tokens before the visible response.
-    // 120 s leaves headroom without exceeding the MCP client's 120 s ceiling.
-    120
+    // 60 s per HTTP request. Gives reasoning models a fair chance, but if
+    // they're too slow the HTTP timeout fires and the fallback model takes
+    // over — leaving enough deadline budget for 2-3 more fast iterations.
+    60
 }
 
 /// Retry policy for backend HTTP calls (chat completions + vision).
