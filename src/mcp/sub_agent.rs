@@ -52,11 +52,11 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
         ));
     }
     let http_timeout = cfg.backend.timeout_secs;
-    let has_fallback = !cfg.backend.fallback_models.is_empty();
+    let mut has_fallback = !cfg.backend.fallback_models.is_empty();
     let mut client = Client::new(cfg.backend.clone())?;
-    // When the primary reasoning model proves too slow for the deadline budget,
-    // we switch to a fast-only client so remaining iterations complete in time.
-    let mut use_fast_only = false;
+    // Only switch to fast-only when v4-pro has timed out twice in a row —
+    // a single slow call could be a cold start; give it another chance.
+    let mut consecutive_timeouts: u32 = 0;
 
     let combined_system = format!("{}{}", system, GROUNDING_GUARD);
     let mut messages = vec![Message::system(&combined_system), Message::user(user)];
@@ -80,25 +80,33 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
             return Ok(finalize_partial(messages, iter, tool_calls_count, total, bytes_in, "deadline"));
         }
 
-        // If the primary model is too slow and we have a fallback, switch to
-        // fast-only before the next call so we don't waste the remaining budget.
-        if !use_fast_only && has_fallback {
+        // Skip the primary model only when it's literally impossible for it
+        // to complete within the remaining budget. Otherwise always try v4-pro
+        // first — its quality is worth the wait.
+        if consecutive_timeouts < 2 && has_fallback {
             let remaining = deadline
                 .saturating_duration_since(std::time::Instant::now())
                 .as_secs();
-            // Not enough time for primary timeout + fallback → skip primary.
-            if remaining < http_timeout.saturating_add(10) as u64 {
+            // Can't even fit the HTTP timeout → skip primary, go fast-only.
+            if remaining <= http_timeout as u64 {
                 tracing::warn!(
                     remaining,
                     http_timeout,
-                    "low remaining budget — switching to fast-only model"
+                    "not enough time for primary model — using fast-only"
                 );
-                use_fast_only = true;
-                let mut fast_cfg = cfg.backend.clone();
-                fast_cfg.model = fast_cfg.fallback_models[0].clone();
-                fast_cfg.fallback_models.clear();
-                client = Client::new(fast_cfg)?;
+                consecutive_timeouts = 2; // force fast-only path below
             }
+        }
+
+        // After 2 consecutive timeouts, the primary model is too slow for this
+        // workload. Rebuild the client with the fallback as primary.
+        if consecutive_timeouts >= 2 && has_fallback {
+            let mut fast_cfg = cfg.backend.clone();
+            fast_cfg.model = fast_cfg.fallback_models[0].clone();
+            fast_cfg.fallback_models.clear();
+            client = Client::new(fast_cfg)?;
+            has_fallback = false; // prevent rebuilding again
+            tracing::warn!("switching to fast-only model for remaining iterations");
         }
 
         let tools = internal_tool_specs();
@@ -118,21 +126,20 @@ pub async fn run(system: &str, user: &str) -> Result<SubAgentRun> {
         };
         let call_elapsed = call_start.elapsed().as_secs();
 
-        // If this call took close to the HTTP timeout, the primary model likely
-        // timed out and the fallback was used. Mark it so we skip the primary on
-        // subsequent iterations and save time.
-        if !use_fast_only && has_fallback && call_elapsed >= http_timeout.saturating_sub(5) as u64 {
+        // Track consecutive primary-model timeouts. A call that took longer
+        // than the HTTP timeout means the primary timed out and the fallback
+        // was used. Reset the counter on fast calls (primary responded in time).
+        if call_elapsed >= http_timeout as u64 {
+            consecutive_timeouts += 1;
             tracing::warn!(
                 iter,
                 call_elapsed,
                 http_timeout,
-                "primary model appears slow — switching to fast-only for remaining iters"
+                consecutive_timeouts,
+                "primary model timed out — fallback handled this call"
             );
-            use_fast_only = true;
-            let mut fast_cfg = cfg.backend.clone();
-            fast_cfg.model = fast_cfg.fallback_models[0].clone();
-            fast_cfg.fallback_models.clear();
-            client = Client::new(fast_cfg)?;
+        } else {
+            consecutive_timeouts = 0;
         }
 
         // One round-trip to the GLM backend is one billable iteration —

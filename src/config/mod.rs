@@ -241,10 +241,11 @@ fn default_max_tokens() -> u32 {
     8000
 }
 fn default_timeout() -> u32 {
-    // 60 s per HTTP request. Gives reasoning models a fair chance, but if
-    // they're too slow the HTTP timeout fires and the fallback model takes
-    // over — leaving enough deadline budget for 2-3 more fast iterations.
-    60
+    // 90 s per HTTP request. Reasoning models (deepseek-v4-pro) can spend
+    // 40-80 s generating hidden thinking tokens before the visible response.
+    // 90 s gives them room while still triggering the fallback path if
+    // they're truly stuck.
+    90
 }
 
 /// Retry policy for backend HTTP calls (chat completions + vision).
@@ -289,10 +290,10 @@ fn default_retry_max_secs() -> u64 {
 pub struct SubAgentConfig {
     #[serde(default = "default_iterations")]
     pub max_iterations: u32,
-    /// Wall-clock budget for one sub-agent run. The default (115 s) leaves a
-    /// 5 s safety margin under the MCP client's 120 s tools/call timeout, so
-    /// the main model never gets stuck waiting for a hung sub-agent. When the
-    /// deadline hits, sub_agent returns the partial summary it has.
+    /// Wall-clock budget for one sub-agent run. The default (175 s) leaves a
+    /// 5 s safety margin under the MCP client's tools/call timeout (180 s for
+    /// codex, 120 s for claude/cursor). When the deadline hits, sub_agent
+    /// returns the partial summary it has.
     #[serde(default = "default_deadline_secs")]
     pub deadline_secs: u64,
     /// Per-chat-call timeout. One stuck GLM response shouldn't eat the whole
@@ -316,18 +317,18 @@ fn default_iterations() -> u32 {
 }
 
 fn default_deadline_secs() -> u64 {
-    // Aligned with the transport layer's 115 s guard. Reasoning models may
-    // only fit one full iteration; fast models can still do 3-5. Either way
-    // we stay under the MCP client's 120 s tools/call ceiling.
-    115
+    // Total sub-agent budget. Aligned with the transport layer's 175 s
+    // guard. With a 90 s HTTP timeout, reasoning models can fit 1-2 slow
+    // calls + 2-3 fast fallback calls before the deadline fires.
+    175
 }
 
 fn default_chat_timeout_secs() -> u64 {
-    // Reasoning models (deepseek-v4-pro, o1, etc.) generate hidden reasoning
-    // tokens before the visible response — a single call can take 60-100 s.
-    // 115 s covers one slow call with a small buffer. Tighter than the 120 s
-    // MCP ceiling so the transport layer has room to return a clean error.
-    115
+    // Per-iteration timeout. Must be > HTTP timeout (90 s) so individual
+    // slow calls complete rather than being cut off. With 170 s, a call
+    // that takes the full 90 s HTTP budget still has room for the fallback
+    // model to respond. Stays under the 175 s transport guard.
+    170
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

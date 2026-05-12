@@ -144,10 +144,10 @@ async fn handle_call_tool(params: CallToolParams) -> Result<Value> {
     let args_for_dispatch = params.arguments;
     let name_for_dispatch = params.name;
     // Wall-clock guard so glance always responds within the MCP client's
-    // 120 s tools/call ceiling. 115 s leaves a 5 s buffer for JSON
-    // serialization / transport overhead while still giving reasoning
-    // models (deepseek-v4-pro) enough room for one full iteration.
-    const TOOL_DISPATCH_TIMEOUT_SECS: u64 = 115;
+    // tools/call ceiling (180 s for codex, 120 s for claude/cursor).
+    // 175 s leaves a 5 s buffer for JSON serialization / transport
+    // overhead while giving reasoning models room for 2-3 iterations.
+    const TOOL_DISPATCH_TIMEOUT_SECS: u64 = 175;
     let dispatch_future = events::CALL_CTX.scope(ctx_for_scope, async move {
         if let Some(agg) = mcp_aggregator::current().await {
             match agg

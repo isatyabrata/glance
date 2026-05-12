@@ -40,7 +40,7 @@ pub fn install() -> Result<()> {
     let mut glance = toml::value::Table::new();
     glance.insert("command".into(), toml::Value::String("glance-mcp".into()));
     glance.insert("startup_timeout_sec".into(), toml::Value::Integer(10));
-    glance.insert("tool_timeout_sec".into(), toml::Value::Integer(120));
+    glance.insert("tool_timeout_sec".into(), toml::Value::Integer(180));
     servers_tbl.insert("glance".into(), toml::Value::Table(glance));
 
     let serialized = toml::to_string_pretty(&doc).context("serialize codex config")?;
